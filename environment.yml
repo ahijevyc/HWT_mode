@@ -31,3 +31,4 @@ dependencies:
     - pytest
     - geopandas
     - regionmask
+    - hagelslag
