@@ -163,7 +163,7 @@ def get_neighborhood_probabilities(labels, model_grid_path, model_names, proj_st
     Returns:
         List of xarray datasets including all model probabilities across the grid for a given model run / forecast hour.
     """
-    ds_list = []
+    ds_list, merged_list = [], []
     storm_grid = xr.open_dataset(model_grid_path)
     for coord in ['lon', 'lat']:
         storm_grid[coord].values = storm_grid[coord].astype('float32')
@@ -222,14 +222,18 @@ def get_neighborhood_probabilities(labels, model_grid_path, model_names, proj_st
 
             ds_list.append(ds)
 
-    merged_ds = xr.concat(ds_list, dim='time')
 
-    # if run_labels['Forecast_Hour'].nunique() < 17:
-    #     merged_ds = add_missing_forecast_hours(merged_ds, 17)
-    # elif (run_labels['Forecast_Hour'].nunique() > 17) & (run_labels['Forecast_Hour'].nunique() < 47):
-    #     merged_ds = add_missing_forecast_hours(merged_ds, 47)
+        merged_ds = xr.concat(ds_list, dim='time')
+        if run_labels['Forecast_Hour'].nunique() < 17:
+            merged_ds = add_missing_forecast_hours(merged_ds, 17)
+        elif (run_labels['Forecast_Hour'].nunique() > 17) & (run_labels['Forecast_Hour'].nunique() < 47):
+            merged_ds = add_missing_forecast_hours(merged_ds, 47)
 
-    return merged_ds
+        merged_list.append(merged_ds)
+
+    all_data = xr.concat(merged_list, dim='time')
+
+    return all_data
 
 
 def add_missing_forecast_hours(ds, n_forecast_hours):

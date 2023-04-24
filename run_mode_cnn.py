@@ -130,7 +130,9 @@ def main():
 
         save_gridded_labels(ds=nprobs,
                             base_path=join(config["output_path"], "evaluation"),
-                            tabular_format=config["output_format"])
+                            tabular_format=config["output_format"],
+                            save_tabular=False,
+                            make_sparse=True)
 
     return
 
