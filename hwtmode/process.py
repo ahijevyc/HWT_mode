@@ -163,7 +163,7 @@ def get_neighborhood_probabilities(labels, model_grid_path, model_names, proj_st
     Returns:
         List of xarray datasets including all model probabilities across the grid for a given model run / forecast hour.
     """
-    ds_list, merged_list = [], []
+    merged_list = []
     storm_grid = xr.open_dataset(model_grid_path)
     for coord in ['lon', 'lat']:
         storm_grid[coord].values = storm_grid[coord].astype('float32')
@@ -175,7 +175,7 @@ def get_neighborhood_probabilities(labels, model_grid_path, model_names, proj_st
             start = pd.to_datetime(run_labels['Run_Date'].min()).strftime("%Y%m%d-%H%M")
             end = pd.to_datetime(run_labels['Run_Date'].max()).strftime("%Y%m%d-%H%M")
             gdf = load_geojson_objs(start, end, json_path, "hourly")
-
+        ds_list = []
         for forecast_hour in run_labels['Forecast_Hour'].unique():
 
             fh_labels = run_labels[run_labels["Forecast_Hour"] == forecast_hour]
