@@ -1,3 +1,4 @@
+import tensorflow as tf
 from tensorflow.keras.layers import Dense, Conv2D, Activation, Input, Flatten, AveragePooling2D, MaxPool2D, LeakyReLU
 from tensorflow.keras.layers import SpatialDropout2D, Dropout
 from tensorflow.keras.models import Model
@@ -7,7 +8,6 @@ from tensorflow.keras.regularizers import l2
 from tensorflow.keras.callbacks import EarlyStopping
 from tensorflow.keras.models import load_model
 from .regularizers import CovarianceRegularizer
-import tensorflow as tf
 import numpy as np
 from tqdm import trange, tqdm
 import pandas as pd
@@ -54,6 +54,7 @@ class BaseConvNet(object):
             last hidden layer to promote more independent activations.
 
     """
+
     def __init__(self, min_filters=16, filter_growth_rate=2, filter_width=5, min_data_width=4, pooling_width=2,
                  hidden_activation="relu", output_type="linear",
                  pooling="mean", use_dropout=False, dropout_alpha=0.0, dense_neurons=64,
