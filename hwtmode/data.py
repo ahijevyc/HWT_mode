@@ -589,19 +589,20 @@ def save_gridded_labels(ds, base_path, tabular_format='csv', save_tabular=True, 
         data = ds.isel(time=[i])
         run_date = pd.to_datetime(data['init_time'].values[0]).strftime('%Y%m%d%H00')
         fh = data['forecast_hour'].values[0]
+        print(fh)
         if make_sparse:
-            file_str = join(base_path, run_date, f"sparse_label_probabilities_{run_date}_fh_{fh:02d}.json")
+            file_str = join(base_path, run_date, f"sparse_label_probabilities_{run_date}_fh_{int(fh):02d}.json")
             sparse_data = sparsify(data)
             with open(file_str, 'w') as out_file:
                 json.dump(sparse_data, out_file)
             print("Succesfully wrote:", file_str)
         else:
-            file_str = join(base_path, run_date, f"label_probabilities_{run_date}_fh_{fh:02d}.nc")
+            file_str = join(base_path, run_date, f"label_probabilities_{run_date}_fh_{int(fh):02d}.nc")
             data.to_netcdf(file_str)
             print("Succesfully wrote:", file_str)
         if save_tabular:
             data_tabular = data.to_dataframe(dim_order=('time', 'y', 'x'))
-            tabular_file_str = join(base_path, run_date, f"label_probabilities_{run_date}_fh_{fh:02d}.{tabular_format}")
+            tabular_file_str = join(base_path, run_date, f"label_probabilities_{run_date}_fh_{int(fh):02d}.{tabular_format}")
             if tabular_format == "csv":
                 data_tabular.to_csv(tabular_file_str, index=False)
             elif tabular_format == "parquet":
@@ -717,10 +718,10 @@ def desparsify(json_path, meta_path):
 
     return ds
 
-def load_geojson_objs(start, end, path, run_freq):
+def load_geojson_objs(start, end, path, prefix, run_freq):
     objects = []
     for run_date in pd.date_range(start, end, freq=run_freq[0]):
-        file_name = join(path, f'HRRR-ZARR_oper_{run_date.strftime("%Y%m%d-%H%M")}.json')
+        file_name = join(path, f'{prefix}{run_date.strftime("%Y%m%d-%H%M")}.json')
         if isfile(file_name):
             objects.append(gpd.read_file(file_name))
         else:

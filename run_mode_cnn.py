@@ -120,19 +120,19 @@ def main():
                              label_path=join(config["output_path"], "labels"),
                              run_freq=config["run_freq"],
                              file_format=config["output_format"])
-
         nprobs = get_neighborhood_probabilities(labels=labels,
                                                 model_grid_path=config["model_grid_path"],
                                                 model_names=model_names,
                                                 proj_str=config["proj_str"],
+                                                run_freq=config["run_freq"],
                                                 obj=config['use_full_obj'],
-                                                json_path=config["csv_data_path"].replace("csv", "json"))
-
+                                                json_path=config["csv_data_path"].replace("csv", "json"),
+                                                json_prefix=config["json_prefix"])
         save_gridded_labels(ds=nprobs,
                             base_path=join(config["output_path"], "evaluation"),
                             tabular_format=config["output_format"],
                             save_tabular=False,
-                            make_sparse=True)
+                            make_sparse=False)
 
     return
 

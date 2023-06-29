@@ -149,7 +149,8 @@ def retrieve_mask_indices(gdf, grid):
     return mask_list
 
 
-def get_neighborhood_probabilities(labels, model_grid_path, model_names, proj_str, obj=False, json_path=None):
+def get_neighborhood_probabilities(labels, model_grid_path, model_names, proj_str, run_freq, obj=False, json_path=None,
+                                   json_prefix=None):
     """
     Gather individual model probabilities and populates onto a grid along with neighborhood probabilities.
     Args:
@@ -169,12 +170,11 @@ def get_neighborhood_probabilities(labels, model_grid_path, model_names, proj_st
         storm_grid[coord].values = storm_grid[coord].astype('float32')
 
     for run_date in sorted(labels['Run_Date'].unique()):
-        print(run_date)
-        run_labels = labels.loc[labels['Run_Date'] == run_date]
+        run_labels = labels.loc[labels['Run_Date'] == run_date].reset_index(drop=True)
         if obj:
             start = pd.to_datetime(run_labels['Run_Date'].min()).strftime("%Y%m%d-%H%M")
             end = pd.to_datetime(run_labels['Run_Date'].max()).strftime("%Y%m%d-%H%M")
-            gdf = load_geojson_objs(start, end, json_path, "hourly")
+            gdf = load_geojson_objs(start, end, json_path, json_prefix, run_freq)
         ds_list = []
         for forecast_hour in run_labels['Forecast_Hour'].unique():
 
