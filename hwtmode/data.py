@@ -645,7 +645,7 @@ def save_labels(labels, out_path, file_format):
         
 def save_gridded_labels(ds, base_path, tabular_format='csv', save_tabular=True, make_sparse=False):
 
-print("Writing out probabilities...")
+    print("Writing out probabilities...")
     run_date_str = pd.to_datetime(ds['init_time'].values).strftime('%Y%m%d%H00')
     for run_date in run_date_str:
         makedirs(join(base_path, run_date), exist_ok=True)
