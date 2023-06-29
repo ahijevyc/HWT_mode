@@ -1,5 +1,8 @@
-data_path: "/glade/scratch/cbecker/HWT_2022_rt_test/track_data_hrrr_3km_nc/"
+data_path: "/glade/scratch/cbecker/HRRR_HWT_2022_real_time/track_data_hrrr_3km_nc_refl/"
+csv_data_path: "/glade/scratch/cbecker/HRRR_HWT_2022_real_time/track_data_hrrr_3km_csv_refl/"
 csv_model_prefix: "track_step_HRRR-ZARR_oper_"
+json_prefix: "HRRR-ZARR_oper_"
+use_full_obj: False
 patch_meta_variables: ["masks", "i", "j", "lon", "lat", "time", "centroid_lon", "centroid_lat",
                  "centroid_i", "centroid_j", "track_id", "track_step", "run_date"]
 csv_meta_variables: ['Valid_Date', 'Run_Date', 'Forecast_Hour', 'Step_ID', 'Track_ID',
@@ -14,7 +17,7 @@ run_start_date: "today"
 run_end_date: "today"
 run_freq: "hourly"
 output_format: "csv"
-output_path: "/glade/scratch/cbecker/HWT_2022_rt/output/"
+output_path: "/glade/scratch/cbecker/HRRR_HWT_2022_real_time/model_output/"
 proj_str: "+proj=lcc +lat_0=38.5 +lon_0=-97.5 +lat_1=38.5 +lat_2=38.5 +a=6371229 +b=6371229"
 models:
   semi_supervised:
@@ -38,9 +41,14 @@ models:
                          "MXUPHL_1hr_max_fcst-5000_2000m_above_ground_max",
                          "Forecast_Hour",
                          "major_axis_length",
-                         "HGT-level_of_adiabatic_condensation_from_sfc_max",
+                         "HGT-level_of_adiabatic_condensation_from_sfc-potential_max",
                          "Centroid_Lon",
-                         "USTM-0_6000m_above_ground_min",
+                         "USTM-0_6000m_above_ground-potential_min",
                          "eccentricity",
                          "MAXUVV_1hr_max_fcst-100_1000mb_above_ground_mean",
                          "TCOLG_1hr_max_fcst-entire_atmosphere_single_layer_mean" ]
+
+#!/bin/bash
+12 * * * * /glade/work/cbecker/HWT_mode/rt_submit_wrapper.sh & >> /glade/scratch/cbecker/HRRR_HWT_2022_real_time/cron.log
+#25 * * * * aws s3 sync --acl public-read /glade/scratch/cbecker/HRRR_HWT_2022_real_time s3://storm-mode >> /glade/scratch/cbecker/HRRR_HWT_2022_real_time/cron.log
+20 * * * * /glade/work/cbecker/HWT_mode/sync_to_AWSS3.sh
