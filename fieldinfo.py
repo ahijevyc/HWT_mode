@@ -4,7 +4,7 @@ import re
 tenths = np.arange(0.1,1.1,0.1)
 fifths = np.arange(0.2,1.2,0.2)
 
-def readcm(name, projdir='/glade/u/home/wrfrt/wwe/python_scripts/'):
+def readcm(name, projdir='/glade/u/home/ahijevyc/bin/'):
     '''Read colormap from file formatted as 0-1 RGB CSV'''
     fh = open(projdir+name, 'r')
     rgb = np.loadtxt(fh)
