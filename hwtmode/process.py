@@ -149,7 +149,8 @@ def retrieve_mask_indices(gdf, grid):
     return mask_list
 
 
-def get_neighborhood_probabilities(labels, model_grid_path, model_names, proj_str, obj=False, json_path=None):
+def get_neighborhood_probabilities(labels, model_grid_path, model_names, proj_str, run_freq, obj=False, json_path=None,
+                                   json_prefix=None):
     """
     Gather individual model probabilities and populates onto a grid along with neighborhood probabilities.
     Args:
@@ -163,19 +164,18 @@ def get_neighborhood_probabilities(labels, model_grid_path, model_names, proj_st
     Returns:
         List of xarray datasets including all model probabilities across the grid for a given model run / forecast hour.
     """
-    ds_list = []
+    merged_list = []
     storm_grid = xr.open_dataset(model_grid_path)
     for coord in ['lon', 'lat']:
         storm_grid[coord].values = storm_grid[coord].astype('float32')
 
     for run_date in sorted(labels['Run_Date'].unique()):
-        print(run_date)
-        run_labels = labels.loc[labels['Run_Date'] == run_date]
+        run_labels = labels.loc[labels['Run_Date'] == run_date].reset_index(drop=True)
         if obj:
             start = pd.to_datetime(run_labels['Run_Date'].min()).strftime("%Y%m%d-%H%M")
             end = pd.to_datetime(run_labels['Run_Date'].max()).strftime("%Y%m%d-%H%M")
-            gdf = load_geojson_objs(start, end, json_path, "hourly")
-
+            gdf = load_geojson_objs(start, end, json_path, json_prefix, run_freq)
+        ds_list = []
         for forecast_hour in run_labels['Forecast_Hour'].unique():
 
             fh_labels = run_labels[run_labels["Forecast_Hour"] == forecast_hour]
@@ -222,14 +222,18 @@ def get_neighborhood_probabilities(labels, model_grid_path, model_names, proj_st
 
             ds_list.append(ds)
 
-    merged_ds = xr.concat(ds_list, dim='time')
 
-    # if run_labels['Forecast_Hour'].nunique() < 17:
-    #     merged_ds = add_missing_forecast_hours(merged_ds, 17)
-    # elif (run_labels['Forecast_Hour'].nunique() > 17) & (run_labels['Forecast_Hour'].nunique() < 47):
-    #     merged_ds = add_missing_forecast_hours(merged_ds, 47)
+        merged_ds = xr.concat(ds_list, dim='time')
+        if run_labels['Forecast_Hour'].nunique() < 17:
+            merged_ds = add_missing_forecast_hours(merged_ds, 17)
+        elif (run_labels['Forecast_Hour'].nunique() > 17) & (run_labels['Forecast_Hour'].nunique() < 47):
+            merged_ds = add_missing_forecast_hours(merged_ds, 47)
 
-    return merged_ds
+        merged_list.append(merged_ds)
+
+    all_data = xr.concat(merged_list, dim='time')
+
+    return all_data
 
 
 def add_missing_forecast_hours(ds, n_forecast_hours):
@@ -273,7 +277,7 @@ def load_hrrr_data(bucket, run_date, run_hour, variables):
     run_date_str = pd.to_datetime(run_date).strftime("%Y%m%d")
     forecast_hour_str = pd.to_datetime(join(run_date, run_hour)).strftime("%H")
     datasets = []
-    coords = None
+
     for i, variable in enumerate(variables):
         files = []
         level = variable.split('-')[1]

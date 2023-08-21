@@ -11,6 +11,8 @@ import joblib
 import s3fs
 from sklearn.preprocessing import StandardScaler
 import geopandas as gpd
+from scipy.sparse import csr_matrix
+import json
 
 
 def load_patch_files(start_date: str, end_date: str, run_freq: str, patch_dir: str, input_variables: list,
@@ -617,18 +619,6 @@ def load_labels(start, end, label_path, run_freq, file_format):
     return pd.concat(labels)
 
 
-def load_geojson_objs(start, end, path, run_freq):
-    objects = []
-    for run_date in pd.date_range(start, end, freq=run_freq[0]):
-        file_name = join(path, f'NCARSTORM_d01_{run_date.strftime("%Y%m%d-%H%M")}.json')
-        if isfile(file_name):
-            objects.append(gpd.read_file(file_name))
-        else:
-            continue
-
-    return pd.concat(objects)
-
-
 def save_labels(labels, out_path, file_format):
     """
     Save storm mode labels to parquet or csv file.
@@ -651,29 +641,38 @@ def save_labels(labels, out_path, file_format):
         else:
             raise ValueError(f'File format {file_format} not found. Please use "parquet" or "csv"')
         print(f'Wrote {file_name}.')
+        
+        
+def save_gridded_labels(ds, base_path, tabular_format='csv', save_tabular=True, make_sparse=False):
 
-
-def save_gridded_labels(ds, base_path, tabular_format='csv'):
     print("Writing out probabilities...")
     run_date_str = pd.to_datetime(ds['init_time'].values).strftime('%Y%m%d%H00')
     for run_date in run_date_str:
         makedirs(join(base_path, run_date), exist_ok=True)
 
     for i in range(ds.time.size):
-
         data = ds.isel(time=[i])
         run_date = pd.to_datetime(data['init_time'].values[0]).strftime('%Y%m%d%H00')
         fh = data['forecast_hour'].values[0]
-        file_str = join(base_path, run_date, f"label_probabilities_{run_date}_fh_{fh:02d}.nc")
-        data.to_netcdf(file_str)
-        print("Succesfully wrote:", file_str)
-        data_tabular = data.to_dataframe(dim_order=('time', 'y', 'x'))
-        tabular_file_str = join(base_path, run_date, f"label_probabilities_{run_date}_fh_{fh:02d}.{tabular_format}")
-        if tabular_format == "csv":
-            data_tabular.to_csv(tabular_file_str, index=False)
-        elif tabular_format == "parquet":
-            data_tabular.to_parquet(tabular_file_str)
-        print("Succesfully wrote:", tabular_file_str)
+        print(fh)
+        if make_sparse:
+            file_str = join(base_path, run_date, f"sparse_label_probabilities_{run_date}_fh_{int(fh):02d}.json")
+            sparse_data = sparsify(data)
+            with open(file_str, 'w') as out_file:
+                json.dump(sparse_data, out_file)
+            print("Succesfully wrote:", file_str)
+        else:
+            file_str = join(base_path, run_date, f"label_probabilities_{run_date}_fh_{int(fh):02d}.nc")
+            data.to_netcdf(file_str)
+            print("Succesfully wrote:", file_str)
+        if save_tabular:
+            data_tabular = data.to_dataframe(dim_order=('time', 'y', 'x'))
+            tabular_file_str = join(base_path, run_date, f"label_probabilities_{run_date}_fh_{int(fh):02d}.{tabular_format}")
+            if tabular_format == "csv":
+                data_tabular.to_csv(tabular_file_str, index=False)
+            elif tabular_format == "parquet":
+                data_tabular.to_parquet(tabular_file_str)
+            print("Succesfully wrote:", tabular_file_str)
     return
 
 
@@ -725,3 +724,72 @@ def load_probabilities(start, end, eval_path, run_freq, file_format):
     elif file_format == 'nc':
 
         return xr.open_mfdataset(files, parallel=True, concat_dim='time', combine='nested').load()
+        
+
+def sparsify(ds):
+    """ Create sparse dictionary using the compressed sparse row matrix to gather locations of non-zero data.
+        Preserves all metadata other than lon / lat.
+
+    ds: (xarray Dataset): Dataset where every variable and coordinate, excluding lon / lat, will be spasrified.
+
+    returns: Dictionary of sparse data. """
+
+    data_vars = list(ds.data_vars)
+    coords = list(ds.coords)
+    sparse_dict = {}
+
+    for c in coords:
+        if c not in ['lat', 'lon']:
+            sparse_dict[c] = ds[c].values.tolist()
+
+    for var in data_vars:
+        sparse_data = csr_matrix(ds[var].squeeze())
+        rows, columns = sparse_data.nonzero()
+        data = ds[var].squeeze().values[rows, columns]
+        sparse_dict[var] = {}
+        sparse_dict[var]['rows'] = rows.astype('uint16').tolist()
+        sparse_dict[var]['columns'] = columns.astype('uint16').tolist()
+        sparse_dict[var]['data'] = data.tolist()
+
+    return sparse_dict
+
+
+def desparsify(json_path, meta_path):
+    """ Loads sparse JSON file and reconstructs full xarray dataset.
+
+    json_path: Path location of sparse JSON file.
+    meta_path: Location of file with meta data (lons / lats).
+
+    returns: Reconstructed Xarray dataset """
+
+    ds = xr.open_dataset(meta_path).expand_dims('time')
+    dims = ['time', 'y', 'x']
+    dim_shape = (1, 65, 93)
+    with open(json_path) as f:
+        sparse_dict = json.load(f)
+
+    for var in sparse_dict.keys():
+        print(var)
+        if len(sparse_dict[var]) == 1:
+            ds = ds.assign_coords({f"{var}": ('time', sparse_dict[var])})
+
+        else:
+            array = np.zeros(shape=(dim_shape))
+            array[:, sparse_dict[var]['rows'], sparse_dict[var]['columns']] = sparse_dict[var]['data']
+            ds[var] = (dims, array)
+
+    ds['init_time'].values = pd.to_datetime(ds['init_time'])
+    ds['valid_time'].values = pd.to_datetime(ds['valid_time'])
+
+    return ds
+
+def load_geojson_objs(start, end, path, prefix, run_freq):
+    objects = []
+    for run_date in pd.date_range(start, end, freq=run_freq[0]):
+        file_name = join(path, f'{prefix}{run_date.strftime("%Y%m%d-%H%M")}.json')
+        if isfile(file_name):
+            objects.append(gpd.read_file(file_name))
+        else:
+            continue
+
+    return pd.concat(objects)
