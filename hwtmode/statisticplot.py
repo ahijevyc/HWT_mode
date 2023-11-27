@@ -291,6 +291,7 @@ def stat_plots(
     sep=0.01,
     suptitle=None,
     fig=None,
+    **kwargs,
 ):
     if fig is None:
         ncols, nrows = 2, 2
@@ -302,7 +303,7 @@ def stat_plots(
         logging.info(f"use old figure {fig} with {fig.get_axes()}")
         axes = iter(fig.get_axes())
 
-    reliability_diagram(next(axes), obs, fcst, thresh)
+    reliability_diagram(next(axes), obs, fcst, thresh, **kwargs)
 
     performance_diagram(next(axes), obs, fcst, thresh, pthresh=pthresh)
 
@@ -316,7 +317,7 @@ def stat_plots(
     """
 
     logging.info("count histogram")
-    count_histogram(next(axes), fcst, count_label=False)
+    count_histogram(next(axes), fcst, count_label=False, **kwargs)
 
     logging.info("ROC curve")
     ROC_curve(next(axes), obs >= o_thresh, fcst, sep=sep)
