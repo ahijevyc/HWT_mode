@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 from sklearn.calibration import calibration_curve
 from sklearn import metrics
-from scikitplot.metrics import plot_roc
+#from scikitplot.metrics import plot_roc
 from tqdm import tqdm
 
 # Use scikitplot.metrics.plot_roc - nice because has adds other blended ROC curves in it.
@@ -276,7 +276,7 @@ def performance_diagram(ax, obs, fcst, thresh, pthresh):
         ax.plot(x, y, label=o)
         for x, y, p in zip(x, y, pthresh):
             if ~np.isnan(x) and ~np.isnan(y):
-                ax.text(x, y, p)
+                ax.text(x, y, f"{p:.1f}" )
 
     ax.legend(title=thresh.name, fontsize="x-small")
     return ax
