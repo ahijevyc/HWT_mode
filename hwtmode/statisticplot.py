@@ -26,7 +26,7 @@ def bss(obs, fcst):
     return 1.0 - bs / climo
 
 
-def reliability_diagram(ax, obs, fcst, thresh, n_bins=10, **kwargs):
+def reliability_diagram(ax, obs, fcst, thresh, n_bins=10, plabel=True, **kwargs):
     no_lines_yet = len(ax.get_lines()) == 0
     if no_lines_yet:
         ax.plot([0, 1], [0, 1], "k", alpha=0.5)
@@ -35,28 +35,29 @@ def reliability_diagram(ax, obs, fcst, thresh, n_bins=10, **kwargs):
         # calibration curve
         true_prob, fcst_prob = calibration_curve(obs >= o_thresh, fcst, n_bins=n_bins)
         bss_val = bss(obs >= o_thresh, fcst)
-        print(f"{bss_val:.4f}")
+        print(f"{bss_val:.3f}")
         base_rate = (obs >= o_thresh).mean()  # base rate
         (s,) = ax.plot(
             fcst_prob,
             true_prob,
             "s-",
-            label=f"{fcst.name} {o_thresh}+ bss:{bss_val:1.4f}",
+            label=f"{fcst.name} bss:{bss_val:1.3f}",
             **kwargs,
         )
-        for x, f in zip(fcst_prob, true_prob):
-            if np.isnan(f):
-                continue  # avoid TypeError: ufunc 'isnan' not supported...
-            # label reliability points
-            ax.annotate(
-                "%1.3f" % f,
-                xy=(x, f),
-                xytext=(0, 1),
-                textcoords="offset points",
-                va="bottom",
-                ha="center",
-                fontsize="xx-small",
-            )
+        if plabel:
+            for x, f in zip(fcst_prob, true_prob):
+                if np.isnan(f):
+                    continue  # avoid TypeError: ufunc 'isnan' not supported...
+                # label reliability points
+                ax.annotate(
+                    "%1.3f" % f,
+                    xy=(x, f),
+                    xytext=(0, 1),
+                    textcoords="offset points",
+                    va="bottom",
+                    ha="center",
+                    fontsize="xx-small",
+                )
 
         noskill_line = ax.plot(
             [0, 1],
@@ -68,7 +69,7 @@ def reliability_diagram(ax, obs, fcst, thresh, n_bins=10, **kwargs):
         )
         baserateline = ax.axhline(
             y=base_rate,
-            label=f"base rate {base_rate:.4f}",
+            label=f"base rate {base_rate:.3f}",
             linewidth=0.5,
             linestyle="dashed",
             dashes=(9, 9),
@@ -82,8 +83,9 @@ def reliability_diagram(ax, obs, fcst, thresh, n_bins=10, **kwargs):
             color=s.get_color(),
         )
 
-    ax.set_ylabel("observed fraction of positives")
-    ax.set_title("reliability diagram")
+    ax.set_xlabel(f"forecast prob. of {o_thresh}+ {obs.name}")
+    ax.set_ylabel(f"obs. fraction of {o_thresh}+ {obs.name}")
+    ax.set_title("(a) Reliability", loc="left")
     ax.legend(loc="upper left", fontsize="xx-small")
     ax.set_xlim((0, 1))
 
@@ -118,7 +120,7 @@ def ROC_curve(ax, obs, fcst, label="", sep=0.1, plabel=True, fill=False):
             marker="+",
             markersize=1 / np.log10(len(pofd)),
             linestyle="solid",
-            label=f"{fcst.name} auc:{auc:1.4f}",
+            label=f"{fcst.name} auc:{auc:1.3f}",
         )
         if fill:
             auc = ax.fill_between(pofd, pody, alpha=0.2)
@@ -141,7 +143,7 @@ def ROC_curve(ax, obs, fcst, label="", sep=0.1, plabel=True, fill=False):
                     logging.debug(
                         f"statisticplot.ROC_curve: toss {x},{y},{s} annotation. Too close to last label."
                     )
-    ax.set_title("receiver operating characteristic curve")
+    ax.set_title("(d) Receiver operating characteristic", loc="left")
 
     ax.set_xlim((0, 1))
     ax.set_ylim((0, 1))
@@ -154,9 +156,26 @@ def ROC_curve(ax, obs, fcst, label="", sep=0.1, plabel=True, fill=False):
 map_crs = ccrs.LambertConformal(central_longitude=-95, standard_parallels=(25, 25))
 
 
-def make_map(bbox=[-121, -72, 22, 50], projection=map_crs, draw_labels=True, scale=1):
-    fig, ax = plt.subplots(figsize=(10, 7), subplot_kw=dict(projection=projection))
+def make_map(
+    figsize=(9,6),
+    bbox=[-121, -72, 22, 50],
+    projection=map_crs,
+    gridlines:bool=False,
+    draw_labels:bool=True,
+    scale=1
+) -> tuple[plt.Figure, plt.Axes]:
+    """cartopy map of CONUS with coastlines, states, etc."""
+    fig, ax = plt.subplots(figsize=figsize, subplot_kw=dict(projection=projection))
     ax.set_extent(bbox)
+    ax = ax_features(ax, scale=scale)
+    if gridlines:
+        gl = ax.gridlines(
+            draw_labels=draw_labels, x_inline=False
+        )
+        gl.top_labels = False
+    return fig, ax
+
+def ax_features(ax, scale=1):
     ax.add_feature(cfeature.BORDERS.with_scale("50m"), linewidth=0.25 * scale)
     ax.add_feature(cfeature.COASTLINE.with_scale("50m"), linewidth=0.25 * scale)
     ax.add_feature(cfeature.STATES.with_scale("50m"), linewidth=0.05 * scale)
@@ -167,11 +186,8 @@ def make_map(bbox=[-121, -72, 22, 50], projection=map_crs, draw_labels=True, sca
         facecolor="k",
         alpha=0.05,
     )
-    gl = ax.gridlines(
-        draw_labels=draw_labels, x_inline=False
-    )
-    gl.top_labels = False
-    return fig, ax
+    return ax
+
 
 
 def far(obs, fcst):
@@ -198,10 +214,10 @@ def count_histogram(ax, fcst, n_bins=10, count_label=True):
     """
     histogram of forecast probability
     """
-    ax.set_xlabel("forecasted probability")
+    ax.set_xlabel("forecast probability")
     ax.set_ylabel("count")
     ax.set_yscale("log")
-    ax.set_title("histogram")
+    ax.set_title("(c) Histogram", loc="left")
     if fcst is None:
         return None
     # Histogram of counts
@@ -227,15 +243,22 @@ def count_histogram(ax, fcst, n_bins=10, count_label=True):
     return ax
 
 
-def performance_diagram(ax, obs, fcst, thresh, pthresh):
+def performance_diagram(ax: plt.axes, obs, fcst, thresh, pthresh):
     """
     performace diagram
     xaxis = 1-far
     yaxis = prob of detection
     where far = fp / (tp+fp)
+
+    Parameters
+    ----------
+
     """
     bias_lines = [0.2, 0.5, 0.8, 1, 1.3, 2, 5]
     csi_lines = np.arange(0.1, 1.0, 0.1)
+    alpha = 0.8
+    lw = 1
+    color="0.8"
     bias_pts = [
         [sr * b for sr in [0, 1.0]] for b in bias_lines
     ]  # compute pod values for each bias line
@@ -249,50 +272,64 @@ def performance_diagram(ax, obs, fcst, thresh, pthresh):
 
     # add bias and CSI lines to performance diagram
     for r in bias_pts:
-        ax.plot([0, 1], r, color="0.5", linestyle="dashed", lw=0.8, alpha=0.6)
+        ax.plot([0, 1], r, color=color, linestyle="dashed", lw=lw, alpha=alpha)
     for r in csi_pts:
         ax.plot(
             np.arange(0.01, 1.01, 0.005),
             r,
-            color="0.5",
-            alpha=0.6,
+            color=color,
+            alpha=alpha,
             linestyle="solid",
-            linewidth=0.5,
+            linewidth=lw,
         )
     for x in [b for b in bias_lines if b <= 1]:
         ax.text(1.002, x, x, va="center", ha="left", fontsize="x-small", color="0.5")
     for x in [b for b in bias_lines if b > 1]:
-        ax.text(1 / x, 1, x, va="bottom", ha="center", fontsize="x-small", color="0.5")
+        ax.text(1 / x, 1, x, va="bottom", ha="center", fontsize="xx-small", color="0.5")
 
     # axes limits, labels
     ax.set_xlim((0, 1))
     ax.set_ylim((0, 1))
-    ax.set_title("performance diagram")
+    ax.set_title("(b) Performance", loc="left")
     ax.set_xlabel("1 - false alarm ratio")
     ax.set_ylabel("probability of detection")
     for o in thresh:
+        ostr = ""
+        if len(thresh) > 1:
+            # Add observation threshold if there are more than one.
+            ostr = f" {o}+"
         x = [1 - far(obs >= o, fcst >= p) for p in pthresh]
         y = [pod(obs >= o, fcst >= p) for p in pthresh]
-        ax.plot(x, y, label=o)
+        ax.plot(x, y, marker='o', label=f"{fcst.name}{ostr}")
         for x, y, p in zip(x, y, pthresh):
             if ~np.isnan(x) and ~np.isnan(y):
-                ax.text(x, y, f"{p:.1f}" )
+                ax.text(x, y, p, fontsize="x-small")
 
-    ax.legend(title=thresh.name, fontsize="x-small")
+    ax.legend(fontsize="x-small", loc="upper right")
     return ax
 
 
 def stat_plots(
-    obs,
-    fcst,
-    thresh=pd.Series(np.arange(1, 10), name=f"obs threshold"),
-    pthresh=pd.Series(np.arange(0, 1.1, 0.2), name=f"prob threshold"),
-    o_thresh=10,
-    sep=0.01,
-    suptitle=None,
-    fig=None,
-    **kwargs,
-):
+        obs: pd.Series,
+        fcst: pd.Series,
+        thresh: pd.Series = pd.Series(np.arange(1, 10), name=f"obs threshold"),
+        pthresh: pd.Series = pd.Series(np.arange(0, 1.1, 0.2), name=f"prob threshold"),
+        o_thresh_roc: float=10,
+        sep: float=0.01,
+        suptitle: str =None,
+        fig: plt.figure =None,
+        **kwargs,
+        ):
+    """
+    Parameters
+    ----------
+    obs : pd.Series
+        truth
+    fcst : pd.Series
+        forecast 
+        forecast.name is used as label
+    """
+
     if fig is None:
         ncols, nrows = 2, 2
         fig, axes = plt.subplots(
@@ -303,7 +340,7 @@ def stat_plots(
         logging.info(f"use old figure {fig} with {fig.get_axes()}")
         axes = iter(fig.get_axes())
 
-    reliability_diagram(next(axes), obs, fcst, thresh, **kwargs)
+    reliability_diagram(next(axes), obs, fcst, thresh, plabel=False, **kwargs)
 
     performance_diagram(next(axes), obs, fcst, thresh, pthresh=pthresh)
 
@@ -320,7 +357,7 @@ def stat_plots(
     count_histogram(next(axes), fcst, count_label=False, **kwargs)
 
     logging.info("ROC curve")
-    ROC_curve(next(axes), obs >= o_thresh, fcst, sep=sep)
+    ROC_curve(next(axes), obs >= o_thresh_roc, fcst, sep=sep, plabel=False)
 
     """
     logging.info("brier skill score")
